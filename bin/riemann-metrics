@@ -1,0 +1,53 @@
+#!/usr/bin/env ruby
+
+require 'riemann/tools'
+require 'json'
+require 'open-uri'
+require 'openssl'
+
+class Riemann::Tools::Metrics
+  include Riemann::Tools
+
+  opt :metric_servlet_uri, "Uri to the metrics servlet", default: 'https://test1.talk.hoccer.de/metrics/registry'
+
+  def initialize
+    abort "FATAL: specify a metric_servlet_uri, see --help for usage" unless opts[:metric_servlet_uri]
+
+    @check = method :report_metrics
+  end
+
+  def alert(service, state, metric, description)
+    report(
+      :service => service.to_s,
+      :state => state.to_s,
+      :metric => metric.to_f,
+      :description => description
+    )
+  end
+
+  def report_metrics
+    metric_json = JSON.load open(opts[:metric_servlet_uri],
+                              {ssl_verify_mode: OpenSSL::SSL::VERIFY_NONE}).read
+
+    report_gauges metric_json['gauges']
+  end
+
+  def report_gauges gauges
+    gauges.each do |name, values|
+      value = values['value']
+      puts "reporting '#{name}' with value '#{value}'"
+      report(
+          :service => name,
+          :state => :ok,
+          :metric => value,
+          :description => name
+      )
+    end
+  end
+
+  def tick
+    @check.call
+  end
+end
+
+Riemann::Tools::Metrics.run
