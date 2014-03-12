@@ -16,32 +16,101 @@ class Riemann::Tools::Metrics
     @check = method :report_metrics
   end
 
-  def alert(service, state, metric, description)
-    report(
-      :service => service.to_s,
-      :state => state.to_s,
-      :metric => metric.to_f,
-      :description => description
-    )
-  end
-
   def report_metrics
     metric_json = JSON.load open(opts[:metric_servlet_uri],
                               {ssl_verify_mode: OpenSSL::SSL::VERIFY_NONE}).read
 
     report_gauges metric_json['gauges']
+    report_counters metric_json['counters']
+    report_meters metric_json['meters']
+    report_timers metric_json['timers']
+    report_histograms metric_json['histograms']
   end
 
   def report_gauges gauges
     gauges.each do |name, values|
       value = values['value']
-      puts "reporting '#{name}' with value '#{value}'"
       report(
           :service => name,
           :state => :ok,
           :metric => value,
           :description => name
       )
+    end
+  end
+
+  def report_counters counters
+    counters.each do |name, values|
+      value = values['value']
+      report(
+          :service => name,
+          :state => :ok,
+          :metric => value,
+          :description => name
+      )
+    end
+  end
+
+  def report_meters meters
+    meters.each do |name, values|
+      report(
+          :service => "#{name} count",
+          :state => :ok,
+          :metric => values['count'],
+          :description => "#{name} count"
+      )
+      %w{m1_rate m5_rate m15_rate mean_rate}.each do |rate|
+        report(
+          :service => "#{name} #{rate}",
+          :state => :ok,
+          :metric => values[rate],
+          :description => "#{name} #{rate} in #{values['units']}"
+      )
+      end
+    end
+  end
+
+  def report_timers timers
+    timers.each do |name, values|
+      %w{count stddev}.each do |measurement|
+        report(
+            :service => "#{name} #{measurement}",
+            :state => :ok,
+            :metric => values[measurement],
+            :description => "#{name} #{measurement}"
+        )
+      end
+      %w{max mean min p50 p75 p95 p98 p99 p999}.each do |timing|
+        report(
+          :service => "#{name} #{timing}",
+          :state => :ok,
+          :metric => values[timing],
+          :description => "#{name} #{timing} in #{values['duration_units']}"
+        )
+      end
+      %w{m1_rate m5_rate m15_rate mean_rate}.each do |rate|
+        report(
+          :service => "#{name} #{rate}",
+          :state => :ok,
+          :metric => values[rate],
+          :description => "#{name} #{rate} in #{values['rate_units']}"
+        )
+      end
+    end
+  end
+
+  # untested - we do not have a histogram so far
+  def report_histograms histograms
+    histograms.each do |name, values|
+      puts name, histogram.inspect
+      %w{count max min mean stddev p50 p75 p95 p99 p999}.each do |name, value|
+        report(
+          :service => "#{name} #{value}",
+          :state => :ok,
+          :metric => values[value],
+          :description => "#{name} #{value}"
+        )
+      end
     end
   end
 
