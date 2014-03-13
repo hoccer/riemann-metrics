@@ -10,8 +10,15 @@ class Riemann::Tools::Metrics
 
   opt :metric_servlet_uri, "Uri to the metrics servlet", default: 'https://test1.talk.hoccer.de/metrics/registry'
 
+  def log message
+    puts message
+    STDOUT.flush
+  end
+
   def initialize
     abort "FATAL: specify a metric_servlet_uri, see --help for usage" unless opts[:metric_servlet_uri]
+
+    log "starting riemann-metrics with metric_servlet_uri: '#{opts[:metric_servlet_uri]}'"
 
     @check = method :report_metrics
   end
