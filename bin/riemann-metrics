@@ -36,13 +36,18 @@ class Riemann::Tools::Metrics
 
   def report_gauges gauges
     gauges.each do |name, values|
-      value = values['value']
-      report(
-          :service => name,
-          :state => :ok,
-          :metric => value,
-          :description => name
-      )
+      begin
+        value = values['value']
+        report(
+            :service => name,
+            :state => :ok,
+            :metric => value,
+            :description => name
+        )
+      rescue Exception => e
+        log "cannot report gauge with name:#{name.inspect} and value:#{value.inspect}!"
+        log "ERROR: #{e} #{e.backtrace}"
+      end
     end
   end
 
